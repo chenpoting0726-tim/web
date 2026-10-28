@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>燈泡控制與隨機跑馬燈</title>
+  <style>
+    /* 讓 body 填滿全螢幕，並使用 Flexbox 讓內容在螢幕完全置中 */
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #ffffff;
+      color: #000000;
+      overflow: hidden; /* 隱藏捲軸 */
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      justify-content: center; /* 垂直居中 */
+      align-items: center;     /* 水平居中 */
+      text-align: center;
+      transition: background-color 0.1s ease; /* 背景切換動畫 */
+    }
+
+    /* 驚悚畫面樣式 */
+    body.scary {
+      background-color: #000000 !important; /* 變成黑色背景 */
+      color: #ff0000 !important;            /* 文字變成血紅色 */
+      animation: shake 0.1s infinite;      /* 畫面微微震動 */
+    }
+
+    /* 驚悚震動效果 */
+    @keyframes shake {
+      0% { transform: translate(1px, 1px) rotate(0deg); }
+      20% { transform: translate(-2px, 0px) rotate(-1deg); }
+      40% { transform: translate(2px, -1px) rotate(1deg); }
+      60% { transform: translate(-1px, 2px) rotate(0deg); }
+      80% { transform: translate(2px, 1px) rotate(1deg); }
+      100% { transform: translate(1px, -2px) rotate(-1deg); }
+    }
+
+    /* 燈泡按鈕容器樣式 */
+    .button-container {
+      margin-top: 15px;
+    }
+
+    .button-container button {
+      padding: 8px 16px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 0 5px;
+      transition: transform 0.2s ease; /* 讓按鈕縮放時平滑漸變 */
+    }
+
+    /* 跑馬燈樣式 (絕對定位於螢幕上飄移) */
+    #marquee {
+      position: absolute;
+      white-space: nowrap;
+      font-size: 24px;
+      font-weight: bold;
+      color: #ff3300;
+      user-select: none;
+      padding: 10px 20px;
+      background: rgba(255, 230, 230, 0.6);
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    /* 遊戲說明方框樣式 */
+    .instructions-card {
+      width: 300px;
+      padding: 14px 18px;
+      background-color: #f8f9fa;
+      border: 2px solid #e9ecef;
+      border-left: 5px solid #ff3300; /* 左側紅色標示條 */
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      text-align: left;
+      font-family: sans-serif;
+      margin-top: 15px;
+    }
+
+    .instructions-card h3 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: 16px;
+      color: #333333;
+    }
+
+    .instructions-card ul {
+      margin: 0;
+      padding-left: 18px;
+      color: #555555;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .instructions-card li {
+      margin-bottom: 4px;
+    }
+
+    /* 彩蛋警告文字樣式 */
+    .instructions-card .warning {
+      color: #d9534f;
+      font-weight: bold;
+    }
+
+    /* 「你已死亡」全螢幕覆蓋層樣式 */
+    #gameOverOverlay {
+      display: none; /* 預設隱藏 */
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0, 0, 0, 0.95);
+      color: #ff0000;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      font-family: sans-serif;
+    }
+
+    #gameOverOverlay h2 {
+      font-size: 60px;
+      margin-bottom: 15px;
+      text-shadow: 0 0 10px #ff0000;
+      animation: pulse 1s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.05); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 置中區塊：標題、燈泡、按鈕 -->
+  <h1 id="titleText">資訊三乙23號陳柏廷</h1>
+
+  <img id="myImage" src="pic/pic_bulboff.gif" width="100" height="180">
+
+  <div class="button-container">
+    <p>
+      <button id="btnOn" type="button" onclick="shrinkAndLight(this, 1)">Light On</button>
+      <button id="btnDim" type="button" onclick="light(2)">Light Dim</button>
+      <button id="btnOff" type="button" onclick="shrinkAndLight(this, 0)">Light Off</button>
+    </p>
+
+    <!-- 遊戲重置按鈕 -->
+    <p>
+      <button type="button" onclick="resetGame()" style="background-color: #ff4d4d; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+        🔄 遊戲重置
+      </button>
+    </p>
+  </div>
+
+  <!-- 遊戲說明方框 -->
+  <div class="instructions-card">
+    <h3>🎮 遊戲說明</h3>
+    <ul>
+      <li>點擊 <strong>Light On / Off</strong>：按鈕會越按越小。</li>
+      <li>點擊 <strong>Light Dim</strong>：切換為微亮燈泡。</li>
+      <li class="warning">⚠️ 觸發 3 次驚悚畫面 或 按鈕縮至極限：<strong>你已死亡！</strong></li>
+    </ul>
+  </div>
+
+  <!-- 隨機跑馬燈元素 -->
+  <div id="marquee">🚀 最新通知：歡迎來到驚嚇燈泡！</div>
+
+  <!-- 死亡結算全螢幕畫面 -->
+  <div id="gameOverOverlay">
+    <h2>💀 你已死亡 💀</h2>
+    <p id="deathReason" style="font-size: 20px; color: #ffffff; margin-bottom: 30px;"></p>
+    <button type="button" onclick="resetGame()" style="padding: 12px 24px; font-size: 18px; background: #ff0000; color: white; border: none; border-radius: 6px; cursor: pointer;">
+      🔄 重新開始
+    </button>
+  </div>
+
+  <script>
+    let scaryTimer = null;
+    let scaryCount = 0; // 紀錄驚悚畫面觸發次數
+    let isDead = false;  // 遊戲死亡狀態
+
+    // 紀錄按鈕縮放比例
+    let scaleOn = 1;
+    let scaleOff = 1;
+
+    // --- 燈泡開關與按鈕縮小邏輯 ---
+    function shrinkAndLight(btnElement, sw) {
+      if (isDead) return;
+
+      // 1. 執行開關燈
+      light(sw);
+
+      // 2. 判斷點擊按鈕並計算縮小比例 (縮小到 0.2 判定死亡)
+      if (sw === 1) {
+        scaleOn -= 0.15;
+        if (scaleOn <= 0.2) {
+          scaleOn = 0.2;
+          btnElement.style.transform = `scale(${scaleOn})`;
+          triggerGameOver("Light On 按鈕已縮到極限！");
+          return;
+        }
+        btnElement.style.transform = `scale(${scaleOn})`;
+      } else if (sw === 0) {
+        scaleOff -= 0.15;
+        if (scaleOff <= 0.2) {
+          scaleOff = 0.2;
+          btnElement.style.transform = `scale(${scaleOff})`;
+          triggerGameOver("Light Off 按鈕已縮到極限！");
+          return;
+        }
+        btnElement.style.transform = `scale(${scaleOff})`;
+      }
+    }
+
+    // --- 燈泡切換邏輯 ---
+    function light(sw) {
+      if (isDead) return;
+
+      var pic;
+      if (sw == 0) {
+        pic = "pic/pic_bulboff.gif"; // 關燈
+      } else if (sw == 1) {
+        pic = "pic/pic_bulbon.gif";  // 開燈
+      } else {
+        pic = "pic/pic_bulbdim.gif"; // 變暗
+
+        // 🎯 13% 機率觸發驚悚畫面
+        if (Math.random() < 0.13) {
+          scaryCount++;
+          triggerScaryEffect();
+
+          // 累積觸發 3 次驚悚畫面，等待驚悚動畫（1秒）過後判定死亡
+          if (scaryCount >= 3) {
+            setTimeout(() => {
+              triggerGameOver("您已累積觸發 3 次驚悚畫面！");
+            }, 1000);
+          }
+        }
+      }
+      document.getElementById('myImage').src = pic;
+    }
+
+    // --- 觸發驚悚效果函數 ---
+    function triggerScaryEffect() {
+      if (scaryTimer) clearTimeout(scaryTimer);
+
+      document.body.classList.add('scary');
+
+      // 1 秒後恢復正常
+      scaryTimer = setTimeout(() => {
+        document.body.classList.remove('scary');
+      }, 1000);
+    }
+
+    // --- 觸發死亡畫面 ---
+    function triggerGameOver(reason) {
+      isDead = true;
+      document.getElementById('deathReason').innerText = reason;
+      document.getElementById('gameOverOverlay').style.display = 'flex';
+    }
+
+    // --- 重置遊戲邏輯 (修正版) ---
+    function resetGame() {
+      isDead = false;
+      scaryCount = 0;
+      scaleOn = 1;
+      scaleOff = 1;
+
+      // 1. 恢復按鈕大小
+      const btnOn = document.getElementById('btnOn');
+      const btnOff = document.getElementById('btnOff');
+
+      if (btnOn) btnOn.style.transform = 'scale(1)';
+      if (btnOff) btnOff.style.transform = 'scale(1)';
+
+      // 2. 隱藏死亡畫面 overlay 與清除驚悚樣式
+      document.getElementById('gameOverOverlay').style.display = 'none';
+      document.body.classList.remove('scary');
+
+      // 3. 燈泡回復關燈狀態
+      light(0);
+    }
+
+    // --- 隨機彈跳跑馬燈邏輯 ---
+    const el = document.getElementById('marquee');
+    
+    // 修復跑馬燈初始語法 (修正了原本無效字元)
+    let x = Math.random() * Math.max(0, (window.innerWidth - 200));
+    let y = Math.random() * Math.max(0, (window.innerHeight - 50));
+    let dx = (Math.random() > 0.5 ? 1 : -1) * 3; // X軸移動速度
+    let dy = (Math.random() > 0.5 ? 1 : -1) * 3; // Y軸移動速度
+
+    function animate() {
+      const rect = el.getBoundingClientRect();
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+
+      // 碰到左右邊界，反轉 X 軸方向
+      if (x + rect.width >= screenWidth || x <= 0) {
+        dx = -dx;
+      }
+      // 碰到上下邊界，反轉 Y 軸方向
+      if (y + rect.height >= screenHeight || y <= 0) {
+        dy = -dy;
+      }
+
+      x += dx;
+      y += dy;
+
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+
+      requestAnimationFrame(animate); // 持續播放動畫
+    }
+
+    // 視窗大小改變時重新計算
+    window.addEventListener('resize', () => {
+      x = Math.min(x, window.innerWidth - el.clientWidth);
+      y = Math.min(y, window.innerHeight - el.clientHeight);
+    });
+
+    // 啟動跑馬燈動畫
+    animate();
+  </script>
+
+</body>
+</html>
